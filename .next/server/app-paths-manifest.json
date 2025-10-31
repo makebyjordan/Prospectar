@@ -1,0 +1,13 @@
+{
+  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
+  "/api/prospectos/route": "app/api/prospectos/route.js",
+  "/api/dashboard/stats/route": "app/api/dashboard/stats/route.js",
+  "/api/seguimientos/route": "app/api/seguimientos/route.js",
+  "/(auth)/register/page": "app/(auth)/register/page.js",
+  "/(dashboard)/dashboard/page": "app/(dashboard)/dashboard/page.js",
+  "/(dashboard)/dashboard/prospectos/page": "app/(dashboard)/dashboard/prospectos/page.js",
+  "/(dashboard)/dashboard/campanas/page": "app/(dashboard)/dashboard/campanas/page.js",
+  "/(dashboard)/dashboard/interacciones/page": "app/(dashboard)/dashboard/interacciones/page.js",
+  "/(dashboard)/dashboard/seguimientos/page": "app/(dashboard)/dashboard/seguimientos/page.js",
+  "/(dashboard)/dashboard/reportes/page": "app/(dashboard)/dashboard/reportes/page.js"
+}

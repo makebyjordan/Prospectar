@@ -1,0 +1,362 @@
+// CRM Prospector Pro - Schema Completo
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// SQLite no soporta enums nativamente - usamos Strings con valores por defecto
+// Valores válidos para cada campo están documentados aquí:
+//
+// UserRole: ADMIN, MANAGER, SALES_REP
+// TamanoEmpresa: AUTONOMO, PEQUENA, MEDIANA, GRANDE
+// PresenciaDigital: NULA, BAJA, MEDIA, ALTA
+// NivelDigitalizacion: PAPEL, BASICO, INTERMEDIO, AVANZADO
+// Prioridad: BAJA, MEDIA, ALTA, URGENTE
+// EstadoProspecto: NUEVO, CONTACTADO, CUALIFICADO, PROPUESTA, NEGOCIACION, GANADO, PERDIDO
+// FuenteOrigen: COLD_CALLING, LINKEDIN, WHATSAPP, EMAIL, REFERIDO, WEB, PDF, MANOSA
+// TipoInteraccion: LLAMADA, EMAIL, WHATSAPP, LINKEDIN, REUNION, NOTA
+// CanalInteraccion: TELEFONO, EMAIL, WHATSAPP, LINKEDIN, PRESENCIAL, ONLINE
+// DireccionInteraccion: ENTRANTE, SALIENTE
+// ResultadoInteraccion: EXITOSA, NO_CONTESTA, BUZON, INTERESADO, NO_INTERESADO, SEGUIR
+// TipoSeguimiento: LLAMADA, EMAIL, WHATSAPP, REUNION, TAREA
+// EstadoSeguimiento: PENDIENTE, EN_PROCESO, COMPLETADO, CANCELADO, VENCIDO
+// CanalAlerta: EMAIL, PUSH, WHATSAPP
+// TipoPlantilla: EMAIL, WHATSAPP
+// EstadoCampana: BORRADOR, PROGRAMADA, ENVIANDO, ENVIADA, CANCELADA
+// TipoConsultaManosa: BUSQUEDA_NICHO, VERIFICACION_DATOS, ANALISIS_PRESENCIA, CHAT_GENERAL
+// EstadoPDF: SUBIDO, PROCESANDO, PROCESADO, ERROR
+// TipoNotificacion: SEGUIMIENTO, ALERTA, SISTEMA, MENSAJE
+
+// Modelos
+model User {
+  id                        String            @id @default(uuid())
+  email                     String            @unique
+  name                      String
+  password                  String
+  role                      String            @default("SALES_REP")
+  avatar                    String?
+  emailConnected            Boolean           @default(false)
+  emailProvider             String?
+  emailCredentials          String?
+  whatsappConnected         Boolean           @default(false)
+  whatsappPhone             String?
+  whatsappApiKey            String?
+  notificationPreferences   String?
+  eInformaApiKey            String?
+  createdAt                 DateTime          @default(now())
+  updatedAt                 DateTime          @updatedAt
+
+  // Relaciones
+  prospectos                Prospecto[]       @relation("ProspectosOwner")
+  interacciones             Interaccion[]     @relation("InteraccionesUser")
+  seguimientosAsignados     Seguimiento[]     @relation("SeguimientosAsignado")
+  seguimientosCreados       Seguimiento[]     @relation("SeguimientosCreador")
+  pipelineStages            PipelineStage[]
+  plantillas                Plantilla[]
+  campanasEmail             CampanaEmail[]
+  campanasWhatsApp          CampanaWhatsApp[]
+  manosaConsultas           ManosaConsulta[]
+  pdfDocuments              PDFDocument[]
+  notificaciones            Notificacion[]
+  auditLogs                 AuditLog[]
+
+  @@index([email])
+}
+
+model Prospecto {
+  id                        String                @id @default(uuid())
+  nombre                    String
+  empresa                   String
+  cargo                     String?
+  email                     String?
+  telefono                  String?
+  whatsapp                  String?
+  linkedinUrl               String?
+  localizacion              String?
+  ciudad                    String?
+  provincia                 String?
+  pais                      String?               @default("España")
+  sector                    String?
+  nicho                     String?
+  tamanoEmpresa             String?               @default("PEQUENA")
+  aniosConstitucion         Int?
+  cif                       String?
+  web                       String?
+  tienePaginaWeb            Boolean               @default(false)
+  tieneRedesSociales        Boolean               @default(false)
+  redesSociales             String?
+  presenciaDigital          String?               @default("BAJA")
+  nivelDigitalizacion       String?               @default("BASICO")
+  usaSoftwareGestion        Boolean               @default(false)
+  softwareActual            String?
+  dolorPrincipal            String?
+  oportunidad               String?
+  presupuestoEstimado       Decimal?
+  prioridad                 String                @default("MEDIA")
+  estado                    String                @default("NUEVO")
+  etapaPipelineId           String?
+  probabilidadCierre        Int                   @default(0)
+  fechaEstimadaCierre       DateTime?
+  fuenteOrigen              String
+  fuenteDetalles            String?
+  tags                      String?
+  notasInternas             String?
+  ownerId                   String
+  verificadoPorManosa       Boolean               @default(false)
+  datosEnriquecidosManosa   String?
+  ultimaInteraccion         DateTime?
+  createdAt                 DateTime              @default(now())
+  updatedAt                 DateTime              @updatedAt
+
+  // Relaciones
+  owner                     User                  @relation("ProspectosOwner", fields: [ownerId], references: [id])
+  etapaPipeline             PipelineStage?        @relation(fields: [etapaPipelineId], references: [id])
+  interacciones             Interaccion[]
+  seguimientos              Seguimiento[]
+  manosaConsultas           ManosaConsulta[]
+  pdfDocument               PDFDocument?          @relation("PDFProspecto")
+  notificaciones            Notificacion[]
+
+  @@index([ownerId])
+  @@index([estado])
+  @@index([prioridad])
+  @@index([email])
+  @@index([empresa])
+}
+
+model Interaccion {
+  id                String                  @id @default(uuid())
+  prospectoId       String
+  tipo              String
+  canal             String
+  direccion         String
+  asunto            String?
+  contenido         String
+  resultado         String?
+  duracion          Int?
+  archivoAdjunto    String?
+  proximoSeguimiento DateTime?
+  userId            String
+  createdAt         DateTime                @default(now())
+
+  // Relaciones
+  prospecto         Prospecto               @relation(fields: [prospectoId], references: [id], onDelete: Cascade)
+  user              User                    @relation("InteraccionesUser", fields: [userId], references: [id])
+
+  @@index([prospectoId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model Seguimiento {
+  id                String              @id @default(uuid())
+  prospectoId       String
+  tipo              String
+  titulo            String
+  descripcion       String?
+  fechaProgramada   DateTime
+  fechaLimite       DateTime?
+  prioridad         String              @default("MEDIA")
+  estado            String              @default("PENDIENTE")
+  alertaEnviada     Boolean             @default(false)
+  alertaTiempo      Int                 @default(30)
+  alertaCanales     String?
+  whatsappDestino   String?
+  completadoEn      DateTime?
+  resultado         String?
+  assignedToId      String
+  createdById       String
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  // Relaciones
+  prospecto         Prospecto           @relation(fields: [prospectoId], references: [id], onDelete: Cascade)
+  assignedTo        User                @relation("SeguimientosAsignado", fields: [assignedToId], references: [id])
+  createdBy         User                @relation("SeguimientosCreador", fields: [createdById], references: [id])
+  notificaciones    Notificacion[]
+
+  @@index([prospectoId])
+  @@index([assignedToId])
+  @@index([fechaProgramada])
+  @@index([estado])
+}
+
+model PipelineStage {
+  id            String      @id @default(uuid())
+  nombre        String
+  orden         Int
+  color         String
+  descripcion   String?
+  userId        String?
+  createdAt     DateTime    @default(now())
+
+  // Relaciones
+  user          User?       @relation(fields: [userId], references: [id])
+  prospectos    Prospecto[]
+
+  @@index([userId])
+  @@index([orden])
+}
+
+model Plantilla {
+  id                String            @id @default(uuid())
+  nombre            String
+  tipo              String
+  asunto            String?
+  contenido         String
+  variables         String?
+  categoria         String?
+  userId            String
+  esGlobal          Boolean           @default(false)
+  vecesUsada        Int               @default(0)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  // Relaciones
+  user              User              @relation(fields: [userId], references: [id])
+  campanasEmail     CampanaEmail[]
+  campanasWhatsApp  CampanaWhatsApp[]
+
+  @@index([userId])
+  @@index([tipo])
+}
+
+model CampanaEmail {
+  id                String          @id @default(uuid())
+  nombre            String
+  asunto            String
+  contenido         String
+  plantillaId       String?
+  prospectoIds      String?
+  estado            String          @default("BORRADOR")
+  fechaProgramada   DateTime?
+  enviados          Int             @default(0)
+  abiertos          Int             @default(0)
+  clicks            Int             @default(0)
+  rebotes           Int             @default(0)
+  errores           Int             @default(0)
+  userId            String
+  createdAt         DateTime        @default(now())
+
+  // Relaciones
+  user              User            @relation(fields: [userId], references: [id])
+  plantilla         Plantilla?      @relation(fields: [plantillaId], references: [id])
+
+  @@index([userId])
+  @@index([estado])
+}
+
+model CampanaWhatsApp {
+  id                String          @id @default(uuid())
+  nombre            String
+  mensaje           String
+  plantillaId       String?
+  prospectoIds      String?
+  estado            String          @default("BORRADOR")
+  fechaProgramada   DateTime?
+  enviados          Int             @default(0)
+  entregados        Int             @default(0)
+  leidos            Int             @default(0)
+  respondidos       Int             @default(0)
+  errores           Int             @default(0)
+  userId            String
+  createdAt         DateTime        @default(now())
+
+  // Relaciones
+  user              User            @relation(fields: [userId], references: [id])
+  plantilla         Plantilla?      @relation(fields: [plantillaId], references: [id])
+
+  @@index([userId])
+  @@index([estado])
+}
+
+model ManosaConsulta {
+  id                String                  @id @default(uuid())
+  tipo              String
+  query             String
+  contexto          String?
+  respuesta         String
+  fuentesUsadas     String?
+  prospectoId       String?
+  datosExtraidos    String?
+  confianza         Int                     @default(0)
+  userId            String
+  createdAt         DateTime                @default(now())
+  processingTime    Int?
+
+  // Relaciones
+  user              User                    @relation(fields: [userId], references: [id])
+  prospecto         Prospecto?              @relation(fields: [prospectoId], references: [id])
+
+  @@index([userId])
+  @@index([prospectoId])
+  @@index([tipo])
+}
+
+model PDFDocument {
+  id                    String          @id @default(uuid())
+  filename              String
+  fileUrl               String
+  fileSize              Int
+  paginas               Int?
+  textoExtraido         String?
+  datosEstructurados    String?
+  prospectoCreatedId    String?         @unique
+  estado                String          @default("SUBIDO")
+  error                 String?
+  userId                String
+  createdAt             DateTime        @default(now())
+
+  // Relaciones
+  user                  User            @relation(fields: [userId], references: [id])
+  prospectoCreated      Prospecto?      @relation("PDFProspecto", fields: [prospectoCreatedId], references: [id])
+
+  @@index([userId])
+  @@index([estado])
+}
+
+model Notificacion {
+  id              String              @id @default(uuid())
+  userId          String
+  tipo            String
+  titulo          String
+  mensaje         String
+  link            String?
+  leida           Boolean             @default(false)
+  prospectoId     String?
+  seguimientoId   String?
+  prioridad       String              @default("MEDIA")
+  createdAt       DateTime            @default(now())
+
+  // Relaciones
+  user            User                @relation(fields: [userId], references: [id])
+  prospecto       Prospecto?          @relation(fields: [prospectoId], references: [id])
+  seguimiento     Seguimiento?        @relation(fields: [seguimientoId], references: [id])
+
+  @@index([userId])
+  @@index([leida])
+  @@index([createdAt])
+}
+
+model AuditLog {
+  id          String    @id @default(uuid())
+  userId      String
+  accion      String
+  entidad     String
+  entidadId   String
+  cambios     String?
+  ip          String?
+  userAgent   String?
+  createdAt   DateTime  @default(now())
+
+  // Relaciones
+  user        User      @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([entidad])
+  @@index([createdAt])
+}

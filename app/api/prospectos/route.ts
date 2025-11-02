@@ -14,6 +14,10 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const search = searchParams.get('search') || ''
     const estado = searchParams.get('estado')
+    const prioridad = searchParams.get('prioridad')
+    const ubicacion = searchParams.get('ubicacion')
+    const orderBy = searchParams.get('orderBy') || 'createdAt'
+    const orderDir = searchParams.get('orderDir') || 'desc'
 
     const where: any = { ownerId: userId }
     
@@ -25,13 +29,35 @@ export async function GET(request: NextRequest) {
       ]
     }
     
-    if (estado) {
+    if (estado && estado !== 'TODOS') {
       where.estado = estado
+    }
+
+    if (prioridad && prioridad !== 'TODAS') {
+      where.prioridad = prioridad
+    }
+
+    if (ubicacion) {
+      where.OR = where.OR || []
+      where.OR.push(
+        { ciudad: { contains: ubicacion } },
+        { provincia: { contains: ubicacion } },
+        { pais: { contains: ubicacion } }
+      )
+    }
+
+    let order: any = { createdAt: 'desc' }
+    if (orderBy === 'prioridad') {
+      order = { prioridad: orderDir }
+    } else if (orderBy === 'estado') {
+      order = { estado: orderDir }
+    } else if (orderBy === 'nombre') {
+      order = { nombre: orderDir }
     }
 
     const prospectos = await prisma.prospecto.findMany({
       where,
-      orderBy: { createdAt: 'desc' },
+      orderBy: order,
       take: 100
     })
 
@@ -61,6 +87,9 @@ export async function POST(request: NextRequest) {
         telefono: data.telefono,
         whatsapp: data.whatsapp,
         sector: data.sector,
+        ciudad: data.ciudad,
+        provincia: data.provincia,
+        pais: data.pais,
         fuenteOrigen: data.fuenteOrigen || 'WEB',
         estado: data.estado || 'NUEVO',
         prioridad: data.prioridad || 'MEDIA',

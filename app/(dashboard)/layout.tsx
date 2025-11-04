@@ -15,6 +15,7 @@ import {
   Menu,
   X,
   LogOut,
+  Link as LinkIcon,
 } from 'lucide-react'
 
 function DashboardContent({ children }: { children: React.ReactNode }) {

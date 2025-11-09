@@ -670,8 +670,6 @@ export default function ProspectosPage() {
                       />
                     </th>
                   )}
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nombre</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cargo</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Empresa</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ciudad</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Provincia</th>
@@ -697,8 +695,6 @@ export default function ProspectosPage() {
                         />
                       </td>
                     )}
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900">{prospecto.nombre}</td>
-                    <td className="px-4 py-3 text-sm text-gray-500">{(prospecto as any).cargo || '-'}</td>
                     <td className="px-4 py-3 text-sm text-gray-500">{prospecto.empresa}</td>
                     <td className="px-4 py-3 text-sm text-gray-500">{(prospecto as any).ciudad || '-'}</td>
                     <td className="px-4 py-3 text-sm text-gray-500">{(prospecto as any).provincia || '-'}</td>

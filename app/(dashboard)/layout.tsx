@@ -37,6 +37,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     { name: 'Interacciones', href: '/dashboard/interacciones', icon: MessageSquare },
     { name: 'Seguimientos', href: '/dashboard/seguimientos', icon: Calendar },
     { name: 'Campañas', href: '/dashboard/campanas', icon: Send },
+    { name: 'Rconect', href: '/dashboard/Rconect', icon: LinkIcon },
     { name: 'Reportes', href: '/dashboard/reportes', icon: BarChart3 },
     { name: 'Configuración', href: '/dashboard/configuracion', icon: Settings },
   ]

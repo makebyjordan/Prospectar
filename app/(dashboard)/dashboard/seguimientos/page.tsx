@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plus, Calendar as CalendarIcon, Clock, CheckCircle2 } from 'lucide-react'
+import { Plus, Calendar as CalendarIcon, Clock, CheckCircle2, Move, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { Input } from '@/components/ui/Input'
@@ -35,6 +35,13 @@ export default function SeguimientosPage() {
     fechaProgramada: '',
     prioridad: 'MEDIA',
     prospectoId: ''
+  })
+  const [isMoveModalOpen, setIsMoveModalOpen] = useState(false)
+  const [selectedSeguimiento, setSelectedSeguimiento] = useState<Seguimiento | null>(null)
+  const [moveData, setMoveData] = useState({
+    destino: '',
+    tipo: '',
+    notas: ''
   })
 
   useEffect(() => {
@@ -114,6 +121,133 @@ export default function SeguimientosPage() {
       TAREA: '✅'
     }
     return icons[tipo] || '📄'
+  }
+
+  const handleOpenMoveModal = (seguimiento: Seguimiento) => {
+    setSelectedSeguimiento(seguimiento)
+    setMoveData({ destino: '', tipo: '', notas: '' })
+    setIsMoveModalOpen(true)
+  }
+
+  const handleCloseMoveModal = () => {
+    setIsMoveModalOpen(false)
+    setSelectedSeguimiento(null)
+    setMoveData({ destino: '', tipo: '', notas: '' })
+  }
+
+  const handleMoveToSection = async () => {
+    if (!selectedSeguimiento || !moveData.destino) {
+      alert('⚠️ Selecciona un destino')
+      return
+    }
+
+    try {
+      const seguimientoData = selectedSeguimiento
+      
+      // Preparar datos según el destino
+      let dataToSend: any = {
+        nombre: seguimientoData.prospecto.nombre,
+        empresa: seguimientoData.prospecto.empresa,
+        email: '',
+        telefono: '',
+        sector: '',
+        ciudad: '',
+        provincia: '',
+        pais: '',
+        fuenteOrigen: 'Seguimientos',
+        prioridad: seguimientoData.prioridad,
+        notas: moveData.notas || `Movido desde Seguimientos el ${new Date().toLocaleDateString()}`
+      }
+
+      let endpoint = ''
+      let successMessage = ''
+
+      // Configurar según destino
+      switch (moveData.destino) {
+        case 'prospectos':
+          endpoint = '/api/prospectos'
+          dataToSend = {
+            ...dataToSend,
+            estado: 'CONTACTADO'
+          }
+          successMessage = `✅ ${seguimientoData.prospecto.nombre} movido a Prospectos`
+          break
+
+        case 'interacciones':
+          endpoint = '/api/interacciones'
+          dataToSend = {
+            prospectoId: seguimientoData.prospecto.id,
+            tipo: moveData.tipo || 'LLAMADA',
+            asunto: seguimientoData.titulo,
+            descripcion: seguimientoData.descripcion || moveData.notas || 'Interacción desde Seguimientos',
+            fecha: new Date().toISOString(),
+            duracion: '',
+            resultado: ''
+          }
+          successMessage = `✅ Interacción registrada para ${seguimientoData.prospecto.nombre}`
+          break
+
+        case 'rconect':
+          endpoint = '/api/rconect'
+          dataToSend = {
+            ...dataToSend,
+            seccion: moveData.tipo || 'otros',
+            origen: 'Seguimientos',
+            estado: 'PENDIENTE',
+            prospectoId: seguimientoData.prospecto.id
+          }
+          successMessage = `✅ ${seguimientoData.prospecto.nombre} movido a Rconect`
+          break
+
+        default:
+          alert('❌ Destino no válido')
+          return
+      }
+
+      // Crear en el destino
+      const resCreate = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(dataToSend)
+      })
+
+      if (!resCreate.ok) {
+        const errorData = await resCreate.json()
+        alert(`❌ Error al mover: ${errorData.error || 'Error desconocido'}`)
+        return
+      }
+
+      // Eliminar de seguimientos
+      const resDelete = await fetch(`/api/seguimientos/${selectedSeguimiento.id}`, { 
+        method: 'DELETE' 
+      })
+      
+      if (resDelete.ok) {
+        alert(successMessage)
+        handleCloseMoveModal()
+        loadSeguimientos()
+      } else {
+        alert('⚠️ Se creó en el destino pero no se pudo eliminar de seguimientos.')
+        handleCloseMoveModal()
+        loadSeguimientos()
+      }
+    } catch (error) {
+      console.error('Error:', error)
+      alert('❌ Error al mover el seguimiento')
+    }
+  }
+
+  const handleDelete = async (id: string, titulo: string) => {
+    if (!confirm(`¿Eliminar el seguimiento "${titulo}"?`)) return
+
+    try {
+      const res = await fetch(`/api/seguimientos/${id}`, { method: 'DELETE' })
+      if (res.ok) {
+        loadSeguimientos()
+      }
+    } catch (error) {
+      console.error('Error:', error)
+    }
   }
 
   const hoy = new Date()
@@ -204,9 +338,25 @@ export default function SeguimientosPage() {
                       </div>
                     </div>
                   </div>
-                  <Button size="sm" variant="outline">
-                    Marcar Completo
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => handleOpenMoveModal(seguimiento)}
+                      title="Mover a otra sección"
+                    >
+                      <Move className="h-4 w-4 mr-1" />
+                      Mover
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => handleDelete(seguimiento.id, seguimiento.titulo)}
+                      title="Eliminar seguimiento"
+                    >
+                      <Trash2 className="h-4 w-4 text-red-600" />
+                    </Button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -310,6 +460,107 @@ export default function SeguimientosPage() {
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* Modal Mover Seguimiento */}
+      <Modal
+        isOpen={isMoveModalOpen}
+        onClose={handleCloseMoveModal}
+        title="Mover Seguimiento"
+        size="lg"
+      >
+        {selectedSeguimiento && (
+          <div className="space-y-4">
+            <div className="bg-blue-50 p-4 rounded-lg">
+              <h3 className="font-medium text-blue-900 mb-2">
+                📅 {selectedSeguimiento.titulo}
+              </h3>
+              <p className="text-sm text-blue-700">
+                {selectedSeguimiento.prospecto.nombre} - {selectedSeguimiento.prospecto.empresa}
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">Destino *</label>
+              <select
+                required
+                value={moveData.destino}
+                onChange={(e) => setMoveData({ ...moveData, destino: e.target.value, tipo: '' })}
+                className="w-full h-10 px-3 border border-gray-300 rounded-md text-sm"
+              >
+                <option value="">Selecciona el destino...</option>
+                <option value="prospectos">💼 Prospectos - Volver a prospectación</option>
+                <option value="interacciones">📞 Interacciones - Registrar comunicación</option>
+                <option value="rconect">🔗 Rconect - Derivar por sectores</option>
+              </select>
+            </div>
+
+            {moveData.destino && moveData.destino !== 'prospectos' && (
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  {moveData.destino === 'interacciones' ? 'Tipo de Interacción' : 'Sección de Rconect'} *
+                </label>
+                <select
+                  required
+                  value={moveData.tipo}
+                  onChange={(e) => setMoveData({ ...moveData, tipo: e.target.value })}
+                  className="w-full h-10 px-3 border border-gray-300 rounded-md text-sm"
+                >
+                  <option value="">Selecciona el tipo...</option>
+                  {moveData.destino === 'interacciones' && (
+                    <>
+                      <option value="LLAMADA">📞 Llamada</option>
+                      <option value="EMAIL">✉️ Email</option>
+                      <option value="WHATSAPP">💬 WhatsApp</option>
+                      <option value="LINKEDIN">🔗 LinkedIn</option>
+                    </>
+                  )}
+                  {moveData.destino === 'rconect' && (
+                    <>
+                      <option value="clinicas">🏥 Clínicas</option>
+                      <option value="inmobiliarias">🏠 Inmobiliarias</option>
+                      <option value="automocion">🚗 Automoción</option>
+                      <option value="empresarial">💼 Empresarial</option>
+                      <option value="otros">🏢 Otros</option>
+                    </>
+                  )}
+                </select>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium mb-2">Notas adicionales</label>
+              <textarea
+                value={moveData.notas}
+                onChange={(e) => setMoveData({ ...moveData, notas: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                rows={3}
+                placeholder="Agrega notas sobre el motivo del movimiento..."
+              />
+            </div>
+
+            <div className="bg-yellow-50 p-4 rounded-lg">
+              <p className="text-sm text-yellow-800">
+                ⚠️ <strong>Importante:</strong> El seguimiento se moverá al destino seleccionado. 
+                Esta acción no se puede deshacer.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4">
+              <Button type="button" variant="outline" onClick={handleCloseMoveModal}>
+                Cancelar
+              </Button>
+              <Button 
+                onClick={handleMoveToSection}
+                disabled={!moveData.destino || (moveData.destino !== 'prospectos' && !moveData.tipo)}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                <Move className="h-4 w-4 mr-2" />
+                Mover Seguimiento
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   )

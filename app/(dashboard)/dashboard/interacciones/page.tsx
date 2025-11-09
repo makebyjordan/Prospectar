@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Phone, Mail, MessageCircle, Plus, Filter, Search, Edit, Trash2, ExternalLink, Eye } from 'lucide-react'
+import { Phone, Mail, MessageCircle, Plus, Filter, Search, Edit, Trash2, ExternalLink, Eye, Move } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Modal } from '@/components/ui/Modal'
@@ -36,6 +36,13 @@ export default function InteraccionesPage() {
     descripcion: '',
     duracion: '',
     resultado: ''
+  })
+  const [isMoveModalOpen, setIsMoveModalOpen] = useState(false)
+  const [selectedInteraccion, setSelectedInteraccion] = useState<Interaccion | null>(null)
+  const [moveData, setMoveData] = useState({
+    destino: '',
+    tipo: '',
+    notas: ''
   })
 
   const [stats, setStats] = useState({
@@ -232,6 +239,120 @@ export default function InteraccionesPage() {
       URGENTE: 'bg-red-100 text-red-800'
     }
     return colors[prioridad] || 'bg-gray-100 text-gray-800'
+  }
+
+  const handleOpenMoveModal = (interaccion: Interaccion) => {
+    setSelectedInteraccion(interaccion)
+    setMoveData({ destino: '', tipo: '', notas: '' })
+    setIsMoveModalOpen(true)
+  }
+
+  const handleCloseMoveModal = () => {
+    setIsMoveModalOpen(false)
+    setSelectedInteraccion(null)
+    setMoveData({ destino: '', tipo: '', notas: '' })
+  }
+
+  const handleMoveToSection = async () => {
+    if (!selectedInteraccion || !moveData.destino) {
+      alert('⚠️ Selecciona un destino')
+      return
+    }
+
+    try {
+      const interaccionData = selectedInteraccion
+      
+      // Preparar datos según el destino
+      let dataToSend: any = {
+        nombre: interaccionData.prospectoNombre,
+        empresa: '',
+        email: '',
+        telefono: '',
+        sector: '',
+        ciudad: '',
+        provincia: '',
+        pais: '',
+        fuenteOrigen: 'Interacciones',
+        prioridad: 'MEDIA',
+        notas: moveData.notas || `Movido desde Interacciones el ${new Date().toLocaleDateString()}`
+      }
+
+      let endpoint = ''
+      let successMessage = ''
+
+      // Configurar según destino
+      switch (moveData.destino) {
+        case 'prospectos':
+          endpoint = '/api/prospectos'
+          dataToSend = {
+            ...dataToSend,
+            estado: 'CONTACTADO'
+          }
+          successMessage = `✅ ${interaccionData.prospectoNombre} movido a Prospectos`
+          break
+
+        case 'seguimientos':
+          endpoint = '/api/seguimientos'
+          dataToSend = {
+            prospectoId: interaccionData.prospectoId,
+            tipo: moveData.tipo || 'LLAMADA',
+            titulo: `Seguimiento: ${interaccionData.asunto}`,
+            descripcion: moveData.notas || `Seguimiento desde interacción: ${interaccionData.descripcion}`,
+            fechaProgramada: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+            prioridad: 'MEDIA',
+            estado: 'PENDIENTE'
+          }
+          successMessage = `✅ Seguimiento creado para ${interaccionData.prospectoNombre}`
+          break
+
+        case 'rconect':
+          endpoint = '/api/rconect'
+          dataToSend = {
+            ...dataToSend,
+            seccion: moveData.tipo || 'otros',
+            origen: 'Interacciones',
+            estado: 'PENDIENTE',
+            prospectoId: interaccionData.prospectoId
+          }
+          successMessage = `✅ ${interaccionData.prospectoNombre} movido a Rconect`
+          break
+
+        default:
+          alert('❌ Destino no válido')
+          return
+      }
+
+      // Crear en el destino
+      const resCreate = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(dataToSend)
+      })
+
+      if (!resCreate.ok) {
+        const errorData = await resCreate.json()
+        alert(`❌ Error al mover: ${errorData.error || 'Error desconocido'}`)
+        return
+      }
+
+      // Eliminar de interacciones
+      const resDelete = await fetch(`/api/interacciones/${selectedInteraccion.id}`, { 
+        method: 'DELETE' 
+      })
+      
+      if (resDelete.ok) {
+        alert(successMessage)
+        handleCloseMoveModal()
+        loadInteracciones()
+      } else {
+        alert('⚠️ Se creó en el destino pero no se pudo eliminar de interacciones.')
+        handleCloseMoveModal()
+        loadInteracciones()
+      }
+    } catch (error) {
+      console.error('Error:', error)
+      alert('❌ Error al mover la interacción')
+    }
   }
 
   return (
@@ -630,6 +751,108 @@ export default function InteraccionesPage() {
             <div className="flex justify-end pt-4">
               <Button onClick={handleCloseInfoModal}>
                 Cerrar
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Modal Mover Interacción */}
+      <Modal
+        isOpen={isMoveModalOpen}
+        onClose={handleCloseMoveModal}
+        title="Mover Interacción"
+        size="lg"
+      >
+        {selectedInteraccion && (
+          <div className="space-y-4">
+            <div className="bg-blue-50 p-4 rounded-lg">
+              <h3 className="font-medium text-blue-900 mb-2">
+                📞 {selectedInteraccion.asunto}
+              </h3>
+              <p className="text-sm text-blue-700">
+                {selectedInteraccion.prospectoNombre} - {selectedInteraccion.tipo}
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-2">Destino *</label>
+              <select
+                required
+                value={moveData.destino}
+                onChange={(e) => setMoveData({ ...moveData, destino: e.target.value, tipo: '' })}
+                className="w-full h-10 px-3 border border-gray-300 rounded-md text-sm"
+              >
+                <option value="">Selecciona el destino...</option>
+                <option value="prospectos">💼 Prospectos - Volver a prospectación</option>
+                <option value="seguimientos">📅 Seguimientos - Programar seguimiento</option>
+                <option value="rconect">🔗 Rconect - Derivar por sectores</option>
+              </select>
+            </div>
+
+            {moveData.destino && moveData.destino !== 'prospectos' && (
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  {moveData.destino === 'seguimientos' ? 'Tipo de Seguimiento' : 'Sección de Rconect'} *
+                </label>
+                <select
+                  required
+                  value={moveData.tipo}
+                  onChange={(e) => setMoveData({ ...moveData, tipo: e.target.value })}
+                  className="w-full h-10 px-3 border border-gray-300 rounded-md text-sm"
+                >
+                  <option value="">Selecciona el tipo...</option>
+                  {moveData.destino === 'seguimientos' && (
+                    <>
+                      <option value="LLAMADA">📞 Llamada</option>
+                      <option value="EMAIL">✉️ Email</option>
+                      <option value="WHATSAPP">💬 WhatsApp</option>
+                      <option value="REUNION">📅 Reunión</option>
+                      <option value="TAREA">✅ Tarea</option>
+                    </>
+                  )}
+                  {moveData.destino === 'rconect' && (
+                    <>
+                      <option value="clinicas">🏥 Clínicas</option>
+                      <option value="inmobiliarias">🏠 Inmobiliarias</option>
+                      <option value="automocion">🚗 Automoción</option>
+                      <option value="empresarial">💼 Empresarial</option>
+                      <option value="otros">🏢 Otros</option>
+                    </>
+                  )}
+                </select>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium mb-2">Notas adicionales</label>
+              <textarea
+                value={moveData.notas}
+                onChange={(e) => setMoveData({ ...moveData, notas: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                rows={3}
+                placeholder="Agrega notas sobre el motivo del movimiento..."
+              />
+            </div>
+
+            <div className="bg-yellow-50 p-4 rounded-lg">
+              <p className="text-sm text-yellow-800">
+                ⚠️ <strong>Importante:</strong> La interacción se moverá al destino seleccionado. 
+                Esta acción no se puede deshacer.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4">
+              <Button type="button" variant="outline" onClick={handleCloseMoveModal}>
+                Cancelar
+              </Button>
+              <Button 
+                onClick={handleMoveToSection}
+                disabled={!moveData.destino || (moveData.destino !== 'prospectos' && !moveData.tipo)}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                <Move className="h-4 w-4 mr-2" />
+                Mover Interacción
               </Button>
             </div>
           </div>
